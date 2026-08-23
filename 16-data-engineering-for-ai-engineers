@@ -1,0 +1,2264 @@
+# 16 - Data Engineering for AI Engineers with Databricks
+
+> A standalone, interview-focused guide to data engineering fundamentals, modern lakehouse architecture, Apache Spark, Delta Lake, Azure Databricks, Unity Catalog, streaming, data modeling, pipeline reliability, governance, and AI/RAG data pipelines.
+
+---
+
+## Learning Objectives
+
+By the end of this chapter, you should be able to:
+
+- Explain the role of data engineering in AI systems
+- Distinguish databases, data warehouses, data lakes, and lakehouses
+- Explain ETL and ELT
+- Design batch and streaming data pipelines
+- Explain Bronze, Silver, and Gold layers
+- Work with Spark DataFrames and understand Spark execution
+- Explain partitions, shuffles, joins, caching, and skew
+- Explain why Delta Lake is used instead of plain Parquet
+- Describe ACID transactions, time travel, schema enforcement, and `MERGE`
+- Explain Unity Catalog, governance, lineage, and access control
+- Explain CDC, incremental ingestion, SCD, and idempotency
+- Design a Databricks pipeline for an enterprise RAG system
+- Answer common Data Engineering and Databricks interview questions
+
+---
+
+# 1. Why Data Engineering Matters for AI Engineers
+
+An AI application is only as reliable as the data reaching it.
+
+```text
+Source Systems
+    ↓
+Ingestion
+    ↓
+Storage
+    ↓
+Cleaning and Transformation
+    ↓
+Governance and Quality
+    ↓
+Features / Chunks / Embeddings
+    ↓
+Model, RAG System, or Agent
+```
+
+An AI engineer should understand data engineering because production AI depends on:
+
+- Fresh data
+- Correct data
+- Complete data
+- Authorized data
+- Traceable data
+- Reproducible transformations
+- Scalable ingestion
+- Reliable scheduling
+
+Typical AI failures caused by data engineering issues include:
+
+```text
+Stale search index
+Duplicate documents
+Missing metadata
+Incorrect permissions
+Partial ingestion
+Schema changes
+Bad OCR output
+Broken joins
+Out-of-order streaming events
+Embedding-index mismatch
+```
+
+---
+
+# 2. Core Data Platform Concepts
+
+## 2.1 Operational Database
+
+An operational database supports day-to-day application transactions.
+
+Examples:
+
+```text
+Create customer
+Update ticket
+Place order
+Record payment
+```
+
+This workload is commonly called:
+
+```text
+OLTP
+Online Transaction Processing
+```
+
+Characteristics:
+
+- Frequent inserts and updates
+- Small queries
+- Low latency
+- Highly normalized schemas
+- Current operational state
+
+Examples:
+
+- PostgreSQL
+- MySQL
+- SQL Server
+- Azure SQL Database
+- Cosmos DB
+
+---
+
+## 2.2 Analytical System
+
+An analytical system supports reporting, aggregates, trends, and historical analysis.
+
+Examples:
+
+```text
+Monthly revenue by region
+Average resolution time
+Grant count by country
+Document ingestion trends
+```
+
+This workload is commonly called:
+
+```text
+OLAP
+Online Analytical Processing
+```
+
+Characteristics:
+
+- Large scans
+- Aggregations
+- Historical data
+- Read-heavy workloads
+- Often denormalized for performance
+
+---
+
+## 2.3 Data Warehouse
+
+A data warehouse stores curated, structured data for analytics and reporting.
+
+Strengths:
+
+- SQL analytics
+- Strong governance
+- Reliable schemas
+- BI performance
+
+Traditional limitation:
+
+- Less flexible for unstructured files, raw data, machine learning artifacts, and rapidly changing schemas
+
+---
+
+## 2.4 Data Lake
+
+A data lake stores large volumes of structured, semi-structured, and unstructured data in low-cost object storage.
+
+Examples:
+
+```text
+CSV
+JSON
+Parquet
+PDF
+Images
+Audio
+Logs
+Model artifacts
+```
+
+Strengths:
+
+- Flexible
+- Scalable
+- Cost effective
+- Suitable for data science and AI
+
+Traditional limitation:
+
+```text
+A collection of files does not automatically provide
+transactions, quality, governance, or reliable table semantics.
+```
+
+---
+
+## 2.5 Lakehouse
+
+A lakehouse combines:
+
+```text
+Data Lake Flexibility
++
+Data Warehouse Reliability
+```
+
+A typical Databricks lakehouse uses:
+
+```text
+Cloud Object Storage
++
+Delta Lake
++
+Apache Spark
++
+Unity Catalog
+```
+
+It supports:
+
+- Data engineering
+- SQL analytics
+- BI
+- Machine learning
+- Streaming
+- GenAI and RAG pipelines
+
+---
+
+# 3. Data Pipelines
+
+A data pipeline moves and processes data from source to destination.
+
+```text
+Source
+    ↓
+Extract / Ingest
+    ↓
+Validate
+    ↓
+Transform
+    ↓
+Store
+    ↓
+Serve
+```
+
+A production pipeline also needs:
+
+```text
+Scheduling
+Retries
+Logging
+Alerts
+Checkpoints
+Data-quality rules
+Lineage
+Security
+Cost controls
+```
+
+---
+
+# 4. ETL and ELT
+
+## 4.1 ETL
+
+```text
+Extract
+Transform
+Load
+```
+
+Flow:
+
+```text
+Sources
+    ↓
+Extract
+    ↓
+Transform in ETL Engine
+    ↓
+Load Clean Data to Target
+```
+
+Use ETL when:
+
+- Data must be cleaned or masked before reaching the target
+- The target cannot process raw data efficiently
+- Legacy warehouse architecture is being used
+- Strict predefined schemas are required before loading
+
+Mental model:
+
+```text
+Clean first, store later.
+```
+
+---
+
+## 4.2 ELT
+
+```text
+Extract
+Load
+Transform
+```
+
+Flow:
+
+```text
+Sources
+    ↓
+Extract
+    ↓
+Load Raw Data
+    ↓
+Transform Inside Lakehouse / Warehouse
+```
+
+Use ELT when:
+
+- The target has scalable compute
+- Raw data should be preserved
+- Transformations may evolve
+- Data must be reprocessed without re-extraction
+- Multiple downstream use cases need different transformations
+
+Mental model:
+
+```text
+Store first, clean later.
+```
+
+---
+
+## 4.3 ETL vs ELT
+
+| Area | ETL | ELT |
+|---|---|---|
+| Transformation timing | Before loading | After loading |
+| Raw data retained | Not always | Usually yes |
+| Flexibility | Lower | Higher |
+| Reprocessing | May require re-extraction | Can rebuild from raw data |
+| Common environment | Traditional warehouse | Cloud warehouse or lakehouse |
+| AI suitability | Possible | Often better for diverse raw data |
+
+Databricks Medallion Architecture usually follows an ELT-oriented pattern:
+
+```text
+Load raw data into Bronze
+    ↓
+Transform into Silver
+    ↓
+Create Gold data products
+```
+
+---
+
+# 5. Batch vs Streaming
+
+## 5.1 Batch Processing
+
+Batch processing handles a bounded collection of data.
+
+Examples:
+
+```text
+Process yesterday's transactions
+Index documents every night
+Generate monthly report
+```
+
+Characteristics:
+
+- Scheduled
+- Clear start and end
+- Higher latency accepted
+- Easier to reason about
+
+---
+
+## 5.2 Streaming Processing
+
+Streaming processes data continuously or incrementally as new events arrive.
+
+Examples:
+
+```text
+Application events
+IoT sensor data
+Fraud alerts
+Clickstream
+New files appearing in storage
+```
+
+Characteristics:
+
+- Unbounded input
+- Incremental state
+- Low or near-real-time latency
+- Requires checkpointing and late-data handling
+
+---
+
+## 5.3 Micro-Batch
+
+Micro-batch processing handles small batches repeatedly.
+
+```text
+New events
+    ↓
+Process every few seconds
+    ↓
+Update result
+```
+
+Apache Spark Structured Streaming commonly presents streaming operations using DataFrame-style APIs and incrementally updates results as data arrives.
+
+---
+
+# 6. Modern Ingestion Concepts
+
+## 6.1 Full Load
+
+Read the entire source every time.
+
+```text
+Simple
+but
+expensive at scale
+```
+
+Use for:
+
+- Small reference tables
+- Initial migration
+- Sources without change tracking
+
+---
+
+## 6.2 Incremental Load
+
+Read only new or changed records.
+
+Techniques:
+
+- Updated timestamp
+- Increasing ID
+- Source watermark
+- File arrival time
+- Change-data feed
+- Database CDC
+
+Benefits:
+
+```text
+Lower compute
+Lower latency
+Faster runs
+Less source-system load
+```
+
+---
+
+## 6.3 Change Data Capture (CDC)
+
+CDC captures inserts, updates, and deletes from a source system.
+
+Conceptual events:
+
+```text
+INSERT customer 100
+UPDATE customer 100
+DELETE customer 100
+```
+
+CDC allows downstream systems to reproduce source changes incrementally.
+
+---
+
+## 6.4 Watermark
+
+A watermark tracks the progress of ingestion or event-time processing.
+
+Batch example:
+
+```text
+Last processed update timestamp = 2026-08-22 10:00
+```
+
+Streaming meaning:
+
+```text
+How long should the system wait for late-arriving events?
+```
+
+---
+
+## 6.5 Checkpoint
+
+A checkpoint stores processing progress and state.
+
+It helps a pipeline resume after failure without restarting from the beginning.
+
+For streaming pipelines, checkpoints can hold:
+
+- Processed offsets
+- Stateful aggregation data
+- Query metadata
+- Recovery information
+
+---
+
+## 6.6 Idempotency
+
+An idempotent pipeline can safely retry without creating incorrect duplicates or repeated side effects.
+
+```text
+Run once  → correct output
+Run twice → same correct output
+```
+
+Techniques:
+
+- Deterministic keys
+- `MERGE` instead of blind append
+- Deduplication
+- Transactional writes
+- Idempotency keys for external APIs
+- Separate checkpoint per streaming query
+
+---
+
+# 7. Medallion Architecture
+
+## 7.1 Bronze Layer
+
+Purpose:
+
+```text
+Preserve raw source data.
+```
+
+Characteristics:
+
+- Minimal transformation
+- Append-oriented
+- Original fields retained
+- Ingestion metadata added
+- Rebuild source for downstream layers
+
+Typical metadata:
+
+```text
+source_system
+ingestion_timestamp
+source_file
+batch_id
+record_hash
+```
+
+AI example:
+
+```text
+Raw PDF
+Raw SharePoint metadata
+Raw Salesforce export
+Raw SQL extract
+```
+
+---
+
+## 7.2 Silver Layer
+
+Purpose:
+
+```text
+Create clean, standardized, validated, integrated data.
+```
+
+Typical transformations:
+
+- Deduplicate
+- Parse dates
+- Standardize country names
+- Handle missing values
+- Enforce schema
+- Join sources
+- Apply business rules
+- Quarantine invalid records
+
+AI example:
+
+```text
+Extracted document text
+Clean metadata
+Normalized document types
+Validated access-control fields
+Document chunks
+```
+
+---
+
+## 7.3 Gold Layer
+
+Purpose:
+
+```text
+Create business-ready and use-case-ready data products.
+```
+
+Examples:
+
+- Aggregated reporting table
+- Feature table
+- Curated AI knowledge table
+- Embedding store
+- Search-index export
+- Executive dashboard dataset
+
+---
+
+## 7.4 Why Keep Bronze?
+
+If downstream logic changes:
+
+```text
+Rebuild Silver and Gold from Bronze
+```
+
+Without Bronze, the team may need to re-extract data from source systems, which may be slow, unavailable, or changed.
+
+---
+
+# 8. File and Table Formats
+
+## 8.1 CSV
+
+Pros:
+
+- Human readable
+- Universal
+
+Cons:
+
+- Weak typing
+- No nested structures
+- Large storage footprint
+- Slow analytical scans
+- Quoting and delimiter issues
+
+---
+
+## 8.2 JSON
+
+Pros:
+
+- Flexible
+- Supports nested structures
+- Good for APIs and events
+
+Cons:
+
+- Verbose
+- Expensive analytical scans
+- Schema drift can be difficult
+
+---
+
+## 8.3 Parquet
+
+Parquet is a columnar storage format.
+
+Benefits:
+
+- Reads selected columns efficiently
+- Compression
+- Predicate pushdown support
+- Strong fit for analytics
+
+Example:
+
+```sql
+SELECT country, amount
+FROM grants
+WHERE year = 2026
+```
+
+A columnar engine can avoid reading unrelated columns.
+
+---
+
+## 8.4 Delta Lake
+
+Delta Lake adds transactional table capabilities over data files.
+
+Key capabilities:
+
+- ACID transactions
+- Schema enforcement
+- Schema evolution
+- Time travel
+- Updates and deletes
+- `MERGE`
+- Batch and streaming interoperability
+- Transaction log
+
+Mental model:
+
+```text
+Parquet = file format
+Delta Lake = table layer with transaction log and reliability
+```
+
+---
+
+# 9. Delta Lake Deep Dive
+
+## 9.1 ACID
+
+### Atomicity
+
+A transaction fully succeeds or fully fails.
+
+### Consistency
+
+Data moves from one valid state to another valid state.
+
+### Isolation
+
+Concurrent operations do not expose partial transactions to one another.
+
+### Durability
+
+Committed data remains available after failures.
+
+---
+
+## 9.2 Delta Transaction Log
+
+Delta tables maintain a transaction log containing table changes and metadata.
+
+Conceptually:
+
+```text
+Version 0: table created
+Version 1: records appended
+Version 2: records updated
+Version 3: schema changed
+```
+
+The log enables table versioning, concurrency control, and time travel.
+
+---
+
+## 9.3 Time Travel
+
+Query an earlier table version:
+
+```sql
+SELECT *
+FROM catalog.schema.grants
+VERSION AS OF 5;
+```
+
+Possible uses:
+
+- Audit
+- Reproducibility
+- Compare pipeline versions
+- Recover from bad writes
+- Reproduce model training datasets
+
+---
+
+## 9.4 Schema Enforcement
+
+Schema enforcement rejects incompatible data instead of silently corrupting the target table.
+
+Example issue:
+
+```text
+expected: grant_amount DOUBLE
+received: grant_amount = "unknown"
+```
+
+---
+
+## 9.5 Schema Evolution
+
+Schema evolution intentionally allows compatible changes such as adding new columns.
+
+Use carefully. Automatic evolution should not become a substitute for data-contract governance.
+
+---
+
+## 9.6 MERGE
+
+`MERGE` supports upsert-style logic.
+
+```sql
+MERGE INTO silver.customers AS target
+USING updates AS source
+ON target.customer_id = source.customer_id
+WHEN MATCHED THEN UPDATE SET *
+WHEN NOT MATCHED THEN INSERT *;
+```
+
+Use cases:
+
+- CDC
+- Incremental loads
+- Metadata refresh
+- Slowly changing dimensions
+- Reprocessing without duplicate inserts
+
+---
+
+## 9.7 VACUUM
+
+`VACUUM` removes old, unreferenced data files according to retention settings.
+
+Trade-off:
+
+```text
+Lower storage
+vs
+Reduced historical recovery window
+```
+
+Retention decisions should consider streaming lag, audit requirements, and time-travel needs.
+
+---
+
+# 10. Data Modeling
+
+## 10.1 Normalization
+
+Normalization reduces duplication by separating entities into related tables.
+
+Suitable for:
+
+```text
+OLTP
+Frequent updates
+Data integrity
+```
+
+Example:
+
+```text
+Customer
+Order
+OrderItem
+Product
+```
+
+---
+
+## 10.2 Denormalization
+
+Denormalization combines data to reduce joins and accelerate analytics.
+
+Suitable for:
+
+```text
+OLAP
+Dashboards
+Gold tables
+Feature-serving tables
+```
+
+---
+
+## 10.3 Star Schema
+
+A star schema contains:
+
+```text
+Fact Table
+    ↓
+Dimension Tables
+```
+
+Example:
+
+```text
+FactGrant
+    ├── DimCountry
+    ├── DimDate
+    ├── DimProgram
+    └── DimOrganization
+```
+
+### Fact Table
+
+Contains measurable events:
+
+- Amount
+- Count
+- Duration
+- Quantity
+
+### Dimension Table
+
+Contains descriptive context:
+
+- Country
+- Customer
+- Product
+- Date
+
+---
+
+## 10.4 Slowly Changing Dimensions
+
+### SCD Type 1
+
+Overwrite old value.
+
+```text
+No history preserved
+```
+
+### SCD Type 2
+
+Create a new version of the record.
+
+Common fields:
+
+```text
+effective_from
+effective_to
+is_current
+```
+
+### SCD Type 3
+
+Store limited previous state in additional columns.
+
+Interview recommendation:
+
+```text
+Know Type 1 and Type 2 thoroughly.
+```
+
+---
+
+# 11. Apache Spark Fundamentals
+
+Apache Spark is a distributed processing engine.
+
+```text
+Driver
+    ↓
+Executors
+    ↓
+Partitions processed in parallel
+```
+
+## 11.1 Driver
+
+The driver:
+
+- Creates the Spark session
+- Builds the execution plan
+- Schedules tasks
+- Coordinates executors
+- Collects metadata and results
+
+Avoid collecting large datasets to the driver.
+
+---
+
+## 11.2 Executors
+
+Executors:
+
+- Run tasks
+- Process partitions
+- Cache data
+- Return results to the driver
+
+---
+
+## 11.3 DataFrame
+
+A Spark DataFrame is a distributed table-like abstraction with named columns and schema.
+
+```python
+df = spark.read.format("delta").table("silver.documents")
+```
+
+Prefer built-in DataFrame and SQL functions because Spark can optimize them.
+
+---
+
+## 11.4 Transformation vs Action
+
+### Transformations
+
+Create a new logical DataFrame.
+
+Examples:
+
+```python
+df.select(...)
+df.filter(...)
+df.groupBy(...)
+df.join(...)
+```
+
+### Actions
+
+Trigger execution.
+
+Examples:
+
+```python
+df.count()
+df.collect()
+df.write.save(...)
+```
+
+---
+
+## 11.5 Lazy Evaluation
+
+Spark delays execution until an action is called.
+
+```text
+Read
+ ↓
+Filter
+ ↓
+Join
+ ↓
+Select
+ ↓
+No execution yet
+ ↓
+Write / Count / Collect
+ ↓
+Execution begins
+```
+
+Benefit:
+
+```text
+Spark can optimize the full plan before running it.
+```
+
+---
+
+## 11.6 Partitions
+
+A partition is a unit of distributed processing.
+
+```text
+DataFrame
+    ├── Partition 1 → Task 1
+    ├── Partition 2 → Task 2
+    └── Partition 3 → Task 3
+```
+
+Too few partitions:
+
+- Limited parallelism
+- Underused cluster
+
+Too many tiny partitions:
+
+- Scheduling overhead
+- Too many output files
+- Metadata pressure
+
+---
+
+## 11.7 Shuffle
+
+A shuffle redistributes data across executors.
+
+Common shuffle operations:
+
+```text
+GroupBy
+Join
+Distinct
+OrderBy
+Repartition
+```
+
+Shuffles are expensive because they involve:
+
+- Network transfer
+- Serialization
+- Disk spill
+- Synchronization
+
+Optimization goal:
+
+```text
+Do not avoid every shuffle.
+Avoid unnecessary shuffles and reduce shuffled data.
+```
+
+---
+
+## 11.8 Narrow vs Wide Transformations
+
+### Narrow
+
+A child partition depends on a small number of parent partitions.
+
+Examples:
+
+```text
+Filter
+Select
+WithColumn
+```
+
+### Wide
+
+A child partition depends on multiple parent partitions.
+
+Examples:
+
+```text
+GroupBy
+Join
+Distinct
+OrderBy
+```
+
+Wide transformations often trigger shuffles.
+
+---
+
+## 11.9 Repartition vs Coalesce
+
+### Repartition
+
+- Can increase or decrease partitions
+- Usually causes a full shuffle
+- Useful for redistribution
+
+```python
+df = df.repartition(100, "country")
+```
+
+### Coalesce
+
+- Usually reduces partitions
+- Avoids a full redistribution when possible
+- Useful before writing fewer files
+
+```python
+df = df.coalesce(10)
+```
+
+---
+
+## 11.10 Cache and Persist
+
+Cache when the same expensive DataFrame is reused multiple times.
+
+```python
+clean_df.cache()
+clean_df.count()  # materializes cache
+```
+
+Do not cache everything.
+
+Caching costs memory and may cause eviction or spill.
+
+---
+
+# 12. Spark Joins
+
+## 12.1 Join Types
+
+Know:
+
+- Inner
+- Left
+- Right
+- Full outer
+- Left semi
+- Left anti
+- Cross
+
+### Left Semi Join
+
+Returns left-side rows with a match on the right.
+
+### Left Anti Join
+
+Returns left-side rows without a match on the right.
+
+Useful for:
+
+```text
+Find missing metadata
+Find unprocessed files
+Find unmatched source records
+```
+
+---
+
+## 12.2 Broadcast Join
+
+When one table is small, broadcast it to every executor.
+
+```python
+from pyspark.sql.functions import broadcast
+
+result = large_df.join(
+    broadcast(small_lookup_df),
+    on="country_code",
+    how="left",
+)
+```
+
+Benefit:
+
+```text
+Avoid shuffling the large table.
+```
+
+Risk:
+
+```text
+Broadcasting a table that is too large can exhaust executor memory.
+```
+
+---
+
+## 12.3 Data Skew
+
+Data skew occurs when some keys contain far more rows than others.
+
+Example:
+
+```text
+Country A → 90% of records
+Other countries → 10%
+```
+
+Symptoms:
+
+- One task runs much longer
+- Most executors finish early
+- Spill and executor memory pressure
+
+Mitigations:
+
+- Filter early
+- Broadcast the small side
+- Salt skewed keys
+- Repartition appropriately
+- Separate heavy keys
+- Use adaptive query execution features where applicable
+
+---
+
+# 13. Spark Performance Concepts
+
+## 13.1 Predicate Pushdown
+
+Push filters toward the data source so fewer rows are read.
+
+```python
+df = (
+    spark.read.format("delta")
+    .table("silver.documents")
+    .filter("document_type = 'Audit Report'")
+)
+```
+
+---
+
+## 13.2 Column Pruning
+
+Read only required columns.
+
+```python
+df = spark.table("silver.documents").select(
+    "document_id",
+    "document_type",
+    "text",
+)
+```
+
+---
+
+## 13.3 Small File Problem
+
+Thousands of tiny files can cause:
+
+- Slow metadata listing
+- Excess task scheduling
+- Poor scan performance
+
+Mitigations include:
+
+- Controlled output partitioning
+- Compaction
+- Optimized writes
+- Managed table optimization features
+
+---
+
+## 13.4 Data Layout
+
+Data layout should support common filters and access patterns.
+
+Poor partitioning can create:
+
+- Too many small partitions
+- Uneven data distribution
+- Expensive scans
+
+Avoid high-cardinality partition columns such as unique IDs.
+
+---
+
+# 14. Structured Streaming
+
+Structured Streaming lets developers express streaming logic using DataFrame-style operations.
+
+```python
+raw_stream = (
+    spark.readStream
+    .format("cloudFiles")
+    .option("cloudFiles.format", "json")
+    .option("cloudFiles.schemaLocation", schema_path)
+    .load(input_path)
+)
+```
+
+## 14.1 Source
+
+Examples:
+
+- Cloud files
+- Kafka
+- Delta table
+- Event streams
+
+## 14.2 Transformation
+
+Examples:
+
+- Filter
+- Parse
+- Enrich
+- Aggregate
+- Deduplicate
+
+## 14.3 Sink
+
+Examples:
+
+- Delta table
+- Kafka
+- Console for testing
+- `foreachBatch` logic
+
+## 14.4 Output Modes
+
+### Append
+
+Output only new final rows.
+
+### Update
+
+Output rows updated since the last trigger.
+
+### Complete
+
+Output the complete result table each trigger.
+
+## 14.5 Watermarks and Late Data
+
+Watermarks limit how long state is retained for late events.
+
+Trade-off:
+
+```text
+Longer waiting window
+    better late-data coverage
+    more state and memory
+```
+
+## 14.6 Stateful vs Stateless
+
+Stateless:
+
+```text
+Filter each event independently
+```
+
+Stateful:
+
+```text
+Aggregation
+Deduplication
+Stream-stream join
+```
+
+---
+
+# 15. Databricks Platform Concepts
+
+## 15.1 Workspace
+
+Collaborative environment for:
+
+- Notebooks
+- Repos
+- Jobs
+- Pipelines
+- SQL
+- Models
+- Experiments
+
+---
+
+## 15.2 Compute
+
+Common categories:
+
+- Interactive compute for development
+- Job compute for automated workloads
+- SQL warehouses for SQL and BI
+- Serverless options where available
+
+Production principle:
+
+```text
+Use ephemeral job compute for scheduled pipelines when practical.
+```
+
+---
+
+## 15.3 Jobs and Workflows
+
+A workflow can orchestrate multiple tasks.
+
+```text
+Ingest
+    ↓
+Validate
+    ↓
+Transform
+    ↓
+Embed
+    ↓
+Index
+```
+
+Production concerns:
+
+- Task dependencies
+- Retries
+- Timeouts
+- Notifications
+- Parameters
+- Environment separation
+- Failure recovery
+
+---
+
+## 15.4 Auto Loader
+
+Auto Loader incrementally processes new files arriving in cloud storage.
+
+Typical use:
+
+```text
+ADLS landing folder
+    ↓
+Auto Loader
+    ↓
+Bronze Delta table
+```
+
+Benefits:
+
+- Incremental file discovery
+- Scalable ingestion
+- Schema tracking
+- Checkpoint-based progress
+
+---
+
+## 15.5 Lakeflow Pipelines
+
+Databricks' current pipeline capabilities support declarative batch and streaming transformations, managed dependencies, data quality, and operational pipeline management.
+
+Conceptual pattern:
+
+```text
+Declare source table
+Declare transformations
+Declare expectations
+Let platform manage dependencies
+```
+
+---
+
+# 16. Unity Catalog
+
+Unity Catalog is the centralized governance layer for data and AI assets in Databricks.
+
+## 16.1 Three-Level Namespace
+
+```text
+catalog.schema.object
+```
+
+Example:
+
+```text
+prod_km.silver.document_chunks
+```
+
+### Catalog
+
+Often represents:
+
+- Environment
+- Business unit
+- Data domain
+
+### Schema
+
+Groups related objects.
+
+### Object
+
+Examples:
+
+- Table
+- View
+- Volume
+- Function
+- Model
+
+---
+
+## 16.2 Access Control
+
+Typical privileges include concepts such as:
+
+```text
+USE CATALOG
+USE SCHEMA
+SELECT
+MODIFY
+CREATE TABLE
+```
+
+Use least privilege.
+
+---
+
+## 16.3 Managed vs External Tables
+
+### Managed Table
+
+Platform manages both metadata and underlying data lifecycle.
+
+### External Table
+
+Platform manages metadata while data stays at an externally governed storage location.
+
+Choice depends on ownership, lifecycle, interoperability, and governance requirements.
+
+---
+
+## 16.4 Volumes
+
+Volumes provide governed access to non-tabular files.
+
+Examples:
+
+```text
+PDFs
+JSON files
+Images
+Model data
+Raw documents
+```
+
+AI use case:
+
+```text
+Store raw enterprise documents in governed volumes before parsing.
+```
+
+---
+
+## 16.5 Lineage
+
+Lineage helps answer:
+
+```text
+Where did this table come from?
+Which jobs created it?
+Which dashboards or models depend on it?
+What breaks if this column changes?
+```
+
+For AI:
+
+```text
+Which document and transformation produced this embedding?
+Which table fed this model or search index?
+```
+
+---
+
+# 17. Data Quality
+
+Data quality dimensions include:
+
+## Completeness
+
+Are required fields present?
+
+## Validity
+
+Do values follow rules?
+
+```text
+country_code has expected format
+```
+
+## Uniqueness
+
+Are identifiers duplicated?
+
+## Accuracy
+
+Does data represent reality?
+
+## Consistency
+
+Do systems use the same formats and definitions?
+
+## Timeliness
+
+Is data sufficiently fresh?
+
+## Referential Integrity
+
+Do foreign keys map to valid parent records?
+
+---
+
+## 17.1 Quarantine Pattern
+
+```text
+Valid Records
+    ↓
+Silver Table
+
+Invalid Records
+    ↓
+Quarantine Table
+```
+
+Do not silently discard bad data without traceability.
+
+---
+
+## 17.2 Data Contracts
+
+A data contract defines expectations between producer and consumer.
+
+Possible contract elements:
+
+- Schema
+- Meaning
+- Allowed values
+- Freshness
+- Ownership
+- Quality thresholds
+- Backward compatibility
+- Change notification
+
+---
+
+# 18. Pipeline Reliability
+
+## Retry
+
+Use for transient failures.
+
+Examples:
+
+- API timeout
+- Temporary network issue
+- Rate limit
+
+Do not blindly retry permanent data errors.
+
+## Dead-Letter or Quarantine Handling
+
+Capture failed records for investigation.
+
+## Backfill
+
+Reprocess historical data for a date range or missed interval.
+
+## Replay
+
+Re-run events from a durable source or checkpoint.
+
+## Audit Columns
+
+Useful fields:
+
+```text
+created_at
+updated_at
+source_system
+batch_id
+pipeline_run_id
+record_hash
+```
+
+## Reconciliation
+
+Compare source and target counts, totals, or hashes.
+
+```text
+Source records = 1000
+Target valid = 980
+Target quarantined = 20
+```
+
+---
+
+# 19. Orchestration
+
+Orchestration coordinates tasks and dependencies.
+
+Examples:
+
+- Azure Data Factory
+- Databricks Workflows
+- Airflow
+- Dagster
+- Prefect
+
+A common Azure pattern:
+
+```text
+Azure Data Factory
+    ↓ triggers
+Databricks Job
+    ↓ writes
+Delta Tables
+    ↓ supplies
+Azure AI Search Indexing
+```
+
+ADF is often effective for cross-service orchestration and connectors. Databricks Workflows are strong when most compute and dependencies live inside Databricks.
+
+Avoid adding both unless each has a clear responsibility.
+
+---
+
+# 20. Data Security and Governance
+
+Data engineering security should cover:
+
+- Identity
+- Authentication
+- Authorization
+- Encryption
+- Network boundaries
+- Secret management
+- Audit logs
+- Data classification
+- Row-level security
+- Column masking
+- Retention
+- Deletion requirements
+
+For enterprise AI, security must be preserved through the entire path:
+
+```text
+Source ACL
+    ↓
+Ingestion Metadata
+    ↓
+Delta Table Permissions
+    ↓
+Search Filter Fields
+    ↓
+RAG Retrieval Filter
+    ↓
+Authorized Answer
+```
+
+Do not rely only on prompt instructions for authorization.
+
+---
+
+# 21. Data Engineering for RAG and GenAI
+
+## 21.1 Document Pipeline
+
+```text
+Source Documents
+    ↓
+Raw Storage
+    ↓
+Parsing / OCR
+    ↓
+Cleaning
+    ↓
+Metadata Enrichment
+    ↓
+Chunking
+    ↓
+Embedding
+    ↓
+Vector/Search Index
+    ↓
+RAG Application
+```
+
+## 21.2 Required Metadata
+
+Useful fields:
+
+```text
+document_id
+chunk_id
+source_uri
+title
+document_type
+process_area
+language
+version
+modified_at
+access_groups
+content_hash
+embedding_model_version
+pipeline_run_id
+```
+
+## 21.3 Incremental Document Processing
+
+Avoid re-embedding everything.
+
+Possible process:
+
+```text
+Calculate content hash
+    ↓
+Compare with previous hash
+    ↓
+Unchanged → skip
+Changed   → reparse, rechunk, re-embed, reindex
+Deleted   → remove from index
+```
+
+## 21.4 Embedding Versioning
+
+If the embedding model changes:
+
+```text
+Old and new vectors may not be comparable.
+```
+
+Track:
+
+- Embedding model
+- Model version
+- Vector dimensions
+- Chunking version
+- Processing timestamp
+
+## 21.5 Index Consistency
+
+Potential failure:
+
+```text
+Delta table updated
+but
+search index update failed
+```
+
+Mitigations:
+
+- Track index status
+- Retry idempotently
+- Reconciliation job
+- Version index builds
+- Blue-green index replacement for major changes
+
+---
+
+# 22. KM 2.0 Case Study
+
+Your KM 2.0 pattern can be explained as:
+
+```text
+SharePoint / Salesforce / SQL
+    ↓
+Databricks ingestion
+    ↓
+Raw files in ADLS / governed volume
+    ↓
+Document parsing and metadata extraction
+    ↓
+Chunk Delta table
+    ↓
+Embedding generation
+    ↓
+Embedding Delta table
+    ↓
+Azure AI Search index
+    ↓
+FastAPI + Azure OpenAI RAG application
+```
+
+In your internal KM 2.0 materials, Databricks is used for heterogeneous ingestion, document processing, chunking, embedding generation, Delta-based storage, scheduling, and feeding Azure AI Search. This is a strong example of end-to-end data engineering for enterprise GenAI.
+
+### Bronze
+
+```text
+Raw documents and raw source metadata
+```
+
+### Silver
+
+```text
+Parsed text
+Normalized metadata
+Validated document records
+Chunks
+```
+
+### Gold
+
+```text
+Embedding-ready and search-ready records
+Curated document inventories
+Business-facing aggregates
+```
+
+The search index is usually better described as a serving layer downstream of curated tables rather than automatically equating it with the Gold layer.
+
+---
+
+# 23. PySpark Code Patterns
+
+## Read Delta Table
+
+```python
+documents = spark.table("km.silver.documents")
+```
+
+## Filter and Select
+
+```python
+from pyspark.sql import functions as F
+
+active_documents = (
+    documents
+    .filter(F.col("is_active") == True)
+    .select(
+        "document_id",
+        "title",
+        "document_type",
+        "text",
+    )
+)
+```
+
+## Add Derived Column
+
+```python
+cleaned = active_documents.withColumn(
+    "normalized_title",
+    F.lower(F.trim(F.col("title"))),
+)
+```
+
+## Deduplicate
+
+```python
+unique_docs = cleaned.dropDuplicates(["document_id"])
+```
+
+## Left Anti Join
+
+```python
+unprocessed = source_docs.join(
+    processed_docs.select("document_id"),
+    on="document_id",
+    how="left_anti",
+)
+```
+
+## Write Delta
+
+```python
+(
+    unique_docs.write
+    .format("delta")
+    .mode("append")
+    .saveAsTable("km.silver.documents")
+)
+```
+
+## Structured Streaming to Delta
+
+```python
+query = (
+    raw_stream.writeStream
+    .format("delta")
+    .option("checkpointLocation", checkpoint_path)
+    .outputMode("append")
+    .toTable("km.bronze.raw_events")
+)
+```
+
+---
+
+# 24. Common Data Engineering Mistakes
+
+- Full reloads when incremental processing is possible
+- No Bronze source-of-truth layer
+- No deterministic primary key
+- Blind append causing duplicates
+- No checkpoint or watermark
+- Running Python loops instead of Spark transformations
+- Calling `collect()` on large datasets
+- Using Python UDFs when built-in Spark functions are available
+- Caching every DataFrame
+- Broadcasting large tables
+- Excessive repartitioning
+- High-cardinality partition columns
+- Thousands of tiny files
+- No schema or data contracts
+- No quarantine path
+- No lineage or audit columns
+- No source-to-target reconciliation
+- Re-embedding every document on every run
+- Losing source permissions before indexing
+
+---
+
+# 25. Interview Questions and Answers
+
+## Q1. What is data engineering?
+
+> Data engineering is the discipline of designing and operating systems that ingest, store, transform, govern, and serve reliable data for analytics, applications, machine learning, and AI.
+
+## Q2. What is ETL?
+
+> ETL means Extract, Transform, Load. Data is transformed before being loaded into the target system.
+
+## Q3. What is ELT?
+
+> ELT means Extract, Load, Transform. Raw data is loaded first and transformed inside the target warehouse or lakehouse.
+
+## Q4. Why is ELT common in Databricks?
+
+> Databricks provides scalable storage and compute, so teams can preserve raw data and build refined layers inside the lakehouse. This supports reprocessing and multiple downstream use cases.
+
+## Q5. Data lake vs warehouse vs lakehouse?
+
+> A data lake stores diverse raw data flexibly. A warehouse provides structured, governed analytical data. A lakehouse combines lake flexibility with warehouse-style transactions, governance, and analytics.
+
+## Q6. Why Delta Lake instead of Parquet?
+
+> Parquet is a columnar file format. Delta Lake adds a transaction log and table capabilities such as ACID transactions, schema enforcement, time travel, updates, deletes, and merge operations.
+
+## Q7. Explain Bronze, Silver, and Gold.
+
+> Bronze preserves raw source data, Silver contains cleaned and integrated data, and Gold contains use-case-ready data products optimized for analytics, applications, ML, or AI.
+
+## Q8. What is Spark lazy evaluation?
+
+> Spark records transformations as a logical plan and delays execution until an action such as a write, count, or collect is requested. This allows the optimizer to improve the execution plan.
+
+## Q9. What is a shuffle?
+
+> A shuffle redistributes data between executors, commonly for joins, aggregations, distinct operations, and repartitioning. It is expensive because it uses network, serialization, and often disk.
+
+## Q10. Repartition vs coalesce?
+
+> Repartition can increase or decrease partitions and performs redistribution. Coalesce is mainly used to reduce partitions with less movement when possible.
+
+## Q11. What is a broadcast join?
+
+> A broadcast join sends a small lookup table to all executors so the large table does not need to be shuffled. It is useful only when the broadcast side safely fits in executor memory.
+
+## Q12. What is data skew?
+
+> Data skew occurs when a small number of keys contain most of the data, causing a few Spark tasks to run much longer than the rest.
+
+## Q13. What is CDC?
+
+> Change Data Capture captures source inserts, updates, and deletes so downstream tables can be updated incrementally.
+
+## Q14. What is idempotency?
+
+> An idempotent pipeline can be retried without producing duplicate records or repeated side effects.
+
+## Q15. What is Unity Catalog?
+
+> Unity Catalog is Databricks' centralized governance layer for data and AI assets, providing a common namespace, access control, metadata, and lineage.
+
+## Q16. Managed vs external table?
+
+> With a managed table, the platform manages metadata and data lifecycle. With an external table, Databricks manages table metadata while files remain in an externally governed location.
+
+## Q17. What is Auto Loader?
+
+> Auto Loader incrementally discovers and ingests new files arriving in cloud storage, using schema and checkpoint information to support scalable ingestion.
+
+## Q18. Batch vs streaming?
+
+> Batch processes bounded datasets periodically. Streaming processes unbounded input incrementally as data arrives.
+
+## Q19. What is a watermark in streaming?
+
+> A watermark defines how long the engine should wait for late event-time data and helps bound state for aggregations, deduplication, and stream joins.
+
+## Q20. How would you design a data pipeline for RAG?
+
+> I would preserve raw documents, parse and validate them, enrich metadata and permissions, chunk them deterministically, generate versioned embeddings, write curated Delta tables, update the search index incrementally, reconcile index status, and retain lineage from each chunk back to its source document.
+
+## Q21. How do you handle a source schema change?
+
+> Detect and classify the change, validate it against a data contract, quarantine incompatible records, intentionally evolve the target schema when approved, and regression-test downstream tables and consumers.
+
+## Q22. How do you optimize a slow Spark job?
+
+> Inspect the Spark UI and physical plan, identify expensive shuffles, skew, spills, scans, and small files, then filter and select earlier, choose suitable joins, adjust partitions, compact data, avoid unnecessary UDFs, and validate improvements with metrics.
+
+## Q23. Why not call `collect()` on a large DataFrame?
+
+> `collect()` moves all rows to the driver, which can exhaust driver memory and remove the benefit of distributed processing.
+
+## Q24. What is SCD Type 2?
+
+> SCD Type 2 preserves history by adding a new record version with effective dates and a current-record indicator instead of overwriting the old value.
+
+## Q25. ADF vs Databricks Workflows?
+
+> ADF is useful for cross-service orchestration and broad connectors. Databricks Workflows are effective for coordinating Databricks-native notebooks, pipelines, SQL, and compute. The right choice depends on orchestration scope and operational ownership.
+
+---
+
+# 26. Senior-Level Architecture Answer
+
+> For an enterprise AI solution, I would use an ELT-oriented lakehouse architecture. Data from systems such as SharePoint, Salesforce, SQL, and APIs would be ingested incrementally into a Bronze layer, preserving raw source data and lineage. Spark and Delta Lake pipelines would validate, deduplicate, standardize, and enrich data into Silver tables. Gold data products would serve analytics, ML, and RAG use cases. Unity Catalog would govern tables, files, models, permissions, and lineage. For unstructured AI workloads, I would track document, chunk, permission, and embedding versions, then update the search index idempotently with reconciliation and observability. I would optimize Spark by controlling partitions, minimizing unnecessary shuffles, using appropriate joins, and addressing skew and small-file problems.
+
+---
+
+# 27. Quick Revision Sheet
+
+```text
+DATA PLATFORM
+=============
+OLTP       → transactional applications
+OLAP       → analytical workloads
+Data Lake  → flexible raw storage
+Warehouse  → structured analytics
+Lakehouse  → lake flexibility + warehouse reliability
+
+PIPELINES
+=========
+ETL → transform before load
+ELT → load raw, transform later
+Batch → bounded data
+Streaming → unbounded incremental data
+CDC → capture inserts, updates, deletes
+Idempotency → safe retry
+
+MEDALLION
+=========
+Bronze → raw
+Silver → clean and integrated
+Gold   → use-case ready
+
+SPARK
+=====
+Driver → plans and coordinates
+Executors → run tasks
+Partition → unit of parallelism
+Lazy evaluation → execute on action
+Shuffle → data movement across executors
+Broadcast → send small table to executors
+Skew → uneven key distribution
+
+DELTA
+=====
+ACID
+Transaction log
+Schema enforcement
+Schema evolution
+Time travel
+MERGE
+Batch + streaming
+
+UNITY CATALOG
+=============
+Governance
+Access control
+Three-level namespace
+Lineage
+Tables, files, functions, models
+
+AI DATA PIPELINE
+================
+Raw documents
+→ parse
+→ clean
+→ metadata
+→ chunks
+→ embeddings
+→ index
+→ RAG
+```
+
+---
+
+# 28. References
+
+- [Azure Databricks Delta Lake Architecture](https://learn.microsoft.com/en-us/azure/databricks/lakehouse-architecture/deployment-guide/delta-lake)
+- [Azure Databricks Structured Streaming Concepts](https://learn.microsoft.com/en-us/azure/databricks/structured-streaming/concepts)
+- [Azure Databricks Structured Streaming Tutorial](https://learn.microsoft.com/en-us/azure/databricks/structured-streaming/tutorial)
+- [Delta Lake Streaming Reads and Writes](https://learn.microsoft.com/en-us/azure/databricks/structured-streaming/delta-lake)
+- [Azure Databricks Join Guidance](https://learn.microsoft.com/en-us/azure/databricks/transform/join)
+- [Unity Catalog with Structured Streaming](https://learn.microsoft.com/en-us/azure/databricks/structured-streaming/unity-catalog)
+- [Unity Catalog with Lakeflow Pipelines](https://learn.microsoft.com/en-us/azure/databricks/ldp/unity-catalog)
+- [ETL vs ELT Overview](https://aws.amazon.com/compare/the-difference-between-etl-and-elt/)
+
+---
+
+# Final Mental Model
+
+```text
+Data Engineering
+    ↓
+Makes data reliable, scalable, governed, and reusable
+    ↓
+Databricks Lakehouse
+    ↓
+Spark + Delta Lake + Unity Catalog
+    ↓
+Analytics + ML + RAG + Agents
+```
