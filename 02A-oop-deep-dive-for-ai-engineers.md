@@ -621,53 +621,54 @@ def add(a, b=0):
 
 ---
 
-# Duck T***ng
+# Duck Typing
 
-Very common Python question.***--
+Very common Python question. 
+---
 
 ## Example
 
 ```python
-class ***k:
+class Duck:
 
     def speak(self):
-       ***turn "Quack"
+       return "Quack"
 
 
 class Person:
 
-  ***ef speak(self):
-        return "***lo"
+  def speak(self):
+        return "Hello"
 
 
 def make_sound(obj):
-    p***t(obj.speak())
+    printt(obj.speak())
 ```
 
 Both work:
 
-***python
+```python
 make_sound(Duck())
-make_s***d(Person())
+make_sound(Person())
 ```
 
 ---
 
-## Intervi***Answer
+## Interview Answer
 
-> Python follows Duck Ty***g. If an object behaves like the***pected type and exposes the requ***d methods, Python allows it to b***sed regardless of inheritance hi***rchy.
+> Python follows Duck Typing. If an object behaves like the expected type and exposes the required methods, Python allows it to be used regardless of inheritance hierarchy.
 
 ---
 
 # Magic Methods
 
-Spe***l methods automatically understo***by Python.
+Special methods automatically understood by Python.
 
 ---
 
 ## __init__
 
-Co***ructor.
+Constructor.
 
 ```python
 class User:
@@ -678,19 +679,19 @@ class User:
 
 ---
 
-## __***__
+## __str__
 
-Human-readable representatio***
+Human-readable representation
 ```python
 def __str__(self):
-  ***eturn self.name
+  return self.name
 ```
 
 ---
 
-## __r***__
+## __repr__
 
-Developer-friendly represent***on.
+Developer-friendly represention.
 
 ```python
 def __repr__(self***    return f"User({self.name})"
@@ -709,12 +710,12 @@ def __eq__(self, ***er):
 
 ---
 
-## Why Dataclasse***re Popular
+## Why Dataclasses are Popular
 
-Dataclasses automati***ly generate:
+Dataclasses automatically generate:
 
 ```python
-__init__***repr__
+__init__ __repr__
 __eq__
 ```
 
@@ -723,19 +724,19 @@ for us.
 ---
 ***Method Resolution Order (MRO)
 
-D***nes how Python searches for meth***.
+Defines how Python searches for method.
 
 ---
 
 ## Example
 
 ```python
-cl*** A:
+class A:
     pass
 
 
 class B(A):
-    p***
+    pass
 
 
 class C(B):
@@ -760,13 +761,13 @@ print(C.mro())
 
 ## Interview Answer
 
-> MRO ***thod Resolution Order) defines t***order in which Python searches f***methods and attributes in inheri***ce hierarchies.
+> MRO method Resolution Order) defines the order in which Python searches f***methods and attributes in inheritance hierarchies.
 
 ---
 
 # Abstract***se Classes (ABC)
 
-Used to enforc***ontracts.
+Used to enforce contracts.
 
 ---
 
@@ -774,7 +775,7 @@ Used to enforc***ontracts.
 
 ```p***on
 from abc import ABC
-from abc ***ort abstractmethod
+from abc import abstractmethod
 
 
 class Tool(***):
@@ -796,41 +797,43 @@ class***archTool(Tool):
 
 ## Interview Answer
 
->***stract Base Classes define contr***s that subclasses must implement***nsuring consistency across imple***tations.
+>Abstract Base Classes define contrtacts that subclasses must implement ensuring consistency across implementations.
 
 ---
 
 # super()
 
-Allows***child class to invoke parent met***s.
+Allows***child class to invoke parent methods.
 
 ---
 
 ## Example
 
 ```python
-c***s Tool:
+class Tool:
 
-    def __init__(self):***      self.name = "Tool"
+    def __init__(self):
+        self.name = "Tool"
 
 
-class***archTool(Tool):
+class SearchTool(Tool):
 
-    def __init_***elf):
-        super().__init__()***      self.type = "Search"
+    def __init__(self):
+        super().__init__()
+        self.type = "Search"
 ```
 
 ***
 
 ## Interview Answer
 
-> super()***lows a child class to access met***s and behavior from its parent c***s. It is commonly used to initia***e parent state before adding chi***specific logic.
+> super() Allows a child class to access methods and behavior from its parent class. It is commonly used to initiative parent state before adding child specific logic.
 
 ---
 
-# Dependen***Injection
+# Dependency Injection
 
-Extremely important b***use FastAPI uses it heavily.
+Extremely important because FastAPI uses it heavily.
 
 --***## Bad
 
@@ -838,7 +841,7 @@ Extremely important b***use FastAPI uses it heavily.
 class Agent:
 
 *** def __init__(self):
-        sel***lm = AzureChatOpenAI()
+        self.llm = AzureChatOpenAI()
 ```
 
 Hard*** test.
