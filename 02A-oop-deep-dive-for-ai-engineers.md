@@ -672,40 +672,41 @@ Constructor.
 
 ```python
 class User:
-
-*** def __init__(self, name):
-     ***self.name = name
+    def __init__(self, name):
+        self.name = name
 ```
 
 ---
 
 ## __str__
 
-Human-readable representation
+Human-readable representation.
+
 ```python
 def __str__(self):
-  return self.name
+    return self.name
 ```
 
 ---
 
 ## __repr__
 
-Developer-friendly represention.
+Developer-friendly representation.
 
 ```python
-def __repr__(self***    return f"User({self.name})"
-***
+def __repr__(self):
+    return f"User({self.name})"
+```
 
 ---
 
 ## __eq__
 
-Equality compa***on.
+Equality comparison.
 
 ```python
-def __eq__(self, ***er):
-    return self.name == oth***name
+def __eq__(self, other):
+    return self.name == other.name
 ```
 
 ---
@@ -715,16 +716,18 @@ def __eq__(self, ***er):
 Dataclasses automatically generate:
 
 ```python
-__init__ __repr__
+__init__
+__repr__
 __eq__
 ```
 
 for us.
 
 ---
-***Method Resolution Order (MRO)
 
-Defines how Python searches for method.
+# Method Resolution Order (MRO)
+
+Defines how Python searches for methods.
 
 ---
 
@@ -743,7 +746,9 @@ class C(B):
     pass
 ```
 
-MRO***```text
+MRO:
+
+```text
 C
 ↓
 B
@@ -753,19 +758,21 @@ A
 object
 ```
 
-***ck:
+Check:
 
 ```python
 print(C.mro())
-``***---
-
-## Interview Answer
-
-> MRO method Resolution Order) defines the order in which Python searches f***methods and attributes in inheritance hierarchies.
+```
 
 ---
 
-# Abstract***se Classes (ABC)
+## Interview Answer
+
+> MRO (Method Resolution Order) defines the order in which Python searches for methods and attributes in inheritance hierarchies.
+
+---
+
+# Abstract Base Classes (ABC)
 
 Used to enforce contracts.
 
@@ -773,37 +780,38 @@ Used to enforce contracts.
 
 ## Example
 
-```p***on
+```python
 from abc import ABC
 from abc import abstractmethod
 
 
-class Tool(***):
+class Tool(ABC):
 
     @abstractmethod
-    def ***cute(self):
+    def execute(self):
         pass
 ```
 
---***Implementation:
+Implementation:
 
 ```python
-class***archTool(Tool):
+class SearchTool(Tool):
 
-    def execute***lf):
-        return "Searching..***```
+    def execute(self):
+        return "Searching..."
+```
 
 ---
 
 ## Interview Answer
 
->Abstract Base Classes define contrtacts that subclasses must implement ensuring consistency across implementations.
+> Abstract Base Classes define contracts that subclasses must implement, ensuring consistency across implementations.
 
 ---
 
 # super()
 
-Allows***child class to invoke parent methods.
+Allows a child class to invoke parent methods.
 
 ---
 
@@ -823,11 +831,11 @@ class SearchTool(Tool):
         self.type = "Search"
 ```
 
-***
+---
 
 ## Interview Answer
 
-> super() Allows a child class to access methods and behavior from its parent class. It is commonly used to initiative parent state before adding child specific logic.
+> super() allows a child class to access methods and behavior from its parent class. It is commonly used to initialize parent state before adding child-specific logic.
 
 ---
 
@@ -835,143 +843,313 @@ class SearchTool(Tool):
 
 Extremely important because FastAPI uses it heavily.
 
---***## Bad
+---
+
+## Bad
 
 ```python
 class Agent:
 
-*** def __init__(self):
+    def __init__(self):
         self.llm = AzureChatOpenAI()
 ```
 
-Hard*** test.
+Hard to test.
 
 ---
 
 ## Better
 
-```pytho***lass Agent:
+```python
+class Agent:
 
-    def __init__(se*** llm):
+    def __init__(self, llm):
         self.llm = llm
-``***Now we can inject:
+```
+
+Now we can inject:
 
 ```python
-Re***LM
+RealLLM
 MockLLM
 TestLLM
 ```
 
 ---
 
-## ***erview Answer
+## Interview Answer
 
-> Dependency Inje***on means supplying dependencies ***m outside an object rather than ***ating them internally. This impr***s flexibility, maintainability, *** testing.
+> Dependency Injection means supplying dependencies from outside an object rather than creating them internally. This improves flexibility, maintainability, and testing.
 
 ---
 
-# OOP in AI Fram***rks
+# OOP in AI Frameworks
 
 ---
 
 # FastAPI
 
 ```python
-a***= FastAPI()
+app = FastAPI()
 ```
 
-Class instantia***n.
+Class instantiation.
 
 ---
 
 # Pydantic
 
 ```python
-c***s ChatRequest(BaseModel):
+class ChatRequest(BaseModel):
 ```
 
-I***ritance.
+Inheritance.
 
 ---
 
 # LangChain
 
-```p***on
-class CustomRetriever(BaseRet***ver):
+```python
+class CustomRetriever(BaseRetriever):
 ```
 
-Inheritance and abstr***ion.
+Inheritance and abstraction.
 
 ---
 
 # LangGraph
 
-```pytho***raph = StateGraph(...)
+```python
+graph = StateGraph(...)
 ```
 
-Obje***oriented framework design.
+Object-oriented framework design.
 
 ---
-***MCP
+
+# MCP
 
 ```python
-mcp = FastMCP("Se***r")
+mcp = FastMCP("Server")
 ```
 
 Object instantiation.
 
-***
+---
 
-# Interview Questions and Answ***
+# Interview Questions and Answers
 
 ---
 
 # Easy Questions
 
-## Q1. ***t are the four pillars of OOP?
+## Q1. What are the four pillars of OOP?
 
-***nswer**
+### Answer
 
 1. Encapsulation
-2. Inh***tance
+2. Inheritance
 3. Polymorphism
-4. Abstrac***n
+4. Abstraction
 
 ---
 
-## Q2. Difference betwee*** class and an object?
+## Q2. Difference between a class and an object?
 
-**Answer****A class is a blueprint or templa***
+### Answer
 
-An object is an instance creat***from that blueprint.
+A class is a blueprint or template.
+
+An object is an instance created from that blueprint.
 
 Example:
 
-***python
+```python
 class User:
     pass
 
-use*** User()
+user = User()
 ```
 
-`User` is the class***`user` is the object.
+`User` is the class.
+
+`user` is the object.
 
 ---
 
-## Q***What is encapsulation?
+## Q3. What is encapsulation?
 
-**Answer***
-Encapsulation is bundling data *** behavior together while restric***g direct access to internal deta***.
+### Answer
+
+Encapsulation is bundling data and behavior together while restricting direct access to internal implementation details.
 
 ---
 
-## Q4. What is inheritan***
+## Q4. What is inheritance?
 
-**Answer**
+### Answer
 
-Inheritance allows***child class to inherit methods a***properties from a parent class f***code reuse and extensibility.
+Inheritance allows a child class to inherit methods and properties from a parent class for code reuse and extensibility.
 
--***
+---
+
 ## Q5. What is polymorphism?
 
-****
+### Answer
+
+Polymorphism allows different classes to provide different implementations of the same interface or method while allowing callers to use a common interface.
+
+Example:
+
+```python
+class AzureRetriever:
+    def retrieve(self):
+        return "Azure Search"
+
+
+class VectorRetriever:
+    def retrieve(self):
+        return "Vector DB"
+
+
+retrievers = [
+    AzureRetriever(),
+    VectorRetriever()
+]
+
+for r in retrievers:
+    print(r.retrieve())
+```
+
+---
+
+## Q6. What is abstraction?
+
+### Answer
+
+Abstraction hides implementation details and exposes only essential functionality to the user.
+
+For example:
+
+```python
+llm.invoke("Hello")
+```
+
+The user does not need to know about:
+
+- API calls
+- Tokenization
+- Retry logic
+- Authentication
+- Connection pooling
+
+---
+
+## Q7. Difference between composition and inheritance?
+
+### Answer
+
+Inheritance represents an "is-a" relationship.
+
+Example:
+
+```python
+Dog is an Animal
+```
+
+Composition represents a "has-a" relationship.
+
+Example:
+
+```python
+Car has an Engine
+```
+
+Modern software systems usually prefer composition because it is more flexible and easier to maintain.
+
+---
+
+## Q8. Difference between static methods and class methods?
+
+### Answer
+
+Static methods:
+
+- Use `@staticmethod`
+- Receive neither `self` nor `cls`
+- Used for utility functions
+
+Class methods:
+
+- Use `@classmethod`
+- Receive `cls`
+- Operate on class-level state
+
+---
+
+## Q9. What is method overriding?
+
+### Answer
+
+Method overriding occurs when a child class provides its own implementation of a parent class method.
+
+Example:
+
+```python
+class Tool:
+    def execute(self):
+        return "Base Execution"
+
+
+class SearchTool(Tool):
+    def execute(self):
+        return "Search Execution"
+```
+
+---
+
+## Q10. Does Python support method overloading?
+
+### Answer
+
+Not in the same way as Java or C#.
+
+Python achieves similar behavior through:
+
+```python
+default arguments
+*args
+**kwargs
+```
+
+Example:
+
+```python
+def add(a, b=0):
+    return a + b
+```
+
+---
+
+## Q11. What is Duck Typing?
+
+### Answer
+
+If an object provides the required behavior, Python allows it to be used regardless of its actual type.
+
+Example:
+
+```python
+class Duck:
+    def speak(self):
+        return "Quack"
+
+
+class Person:
+    def speak(self):
+        return "Hello"
+
+
+def make_sound(obj):
+    print(obj.speak())
+```
